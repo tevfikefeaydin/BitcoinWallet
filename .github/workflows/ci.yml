@@ -43,3 +43,16 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run lint
       - run: npm test -- --runInBand
+
+  ios-tooling:
+    name: iOS Ruby dependency resolution
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+      - run: bundle install --jobs 4 --retry 3

@@ -17,7 +17,7 @@ React Native ve resmi [BDK-RN 1.0](https://github.com/bitcoindevkit/bdk-rn) taba
 
 ## Geliştirme
 
-Gereksinimler: Node.js 22.11+, JDK 17 ve Android SDK.
+Android gereksinimleri: Node.js 22.11+, JDK 17 ve Android SDK. iOS bağımlılık çözümü ayrıca Ruby 3.1+ gerektirir.
 
 ```bash
 npm ci

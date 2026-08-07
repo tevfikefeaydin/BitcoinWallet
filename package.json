@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@bitcoindevkit/bdk-wallet-web": "^0.3.0",
-    "@scure/bip39": "^1.4.0"
+    "@scure/bip39": "^2.2.0"
   },
   "overrides": {
     "uuid": "11.1.1"

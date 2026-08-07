@@ -18,7 +18,7 @@
     "@react-navigation/native": "^7.3.15",
     "@react-navigation/native-stack": "^7.18.7",
     "bdk-rn": "https://github.com/bitcoindevkit/bdk-rn/releases/download/v1.0.0/bdk-rn-1.0.0.tgz",
-    "react": "19.2.3",
+    "react": "19.2.8",
     "react-native": "0.86.2",
     "react-native-get-random-values": "^2.0.0",
     "react-native-keychain": "^10.0.0",

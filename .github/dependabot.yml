@@ -5,12 +5,25 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /mobile
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      react-family:
+        patterns:
+          - react
+          - react-test-renderer
+          - "@types/react"
+          - "@types/react-test-renderer"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

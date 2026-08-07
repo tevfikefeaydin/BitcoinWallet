@@ -1,0 +1,43 @@
+# Dependencies and generated output
+**/node_modules/
+**/build/
+**/.gradle/
+**/.kotlin/
+**/.cxx/
+dist/
+coverage/
+
+# Machine-local tooling and editor state
+tools/
+drvtmp/
+.claude/
+.idea/
+.vscode/
+mobile/.bundle/
+
+# Android/iOS machine configuration
+**/local.properties
+**/DerivedData/
+**/Pods/
+*.jks
+*.p12
+*.cer
+*.mobileprovision
+
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Binary releases are published through GitHub Releases
+*.apk
+*.aab
+*.ipa
+
+# Obsolete local dependency patches
+mobile/patches/
+
+# OS and logs
+.DS_Store
+Thumbs.db
+*.log

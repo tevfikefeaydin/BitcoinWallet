@@ -29,7 +29,10 @@ The tested ARM64 APK is published under [GitHub Releases](https://github.com/tev
 
 ## Validation
 
+Requires Node.js 22.11+, JDK 17, the Android SDK and Git. Yarn must be installed before the first install: `bdk-rn` pulls `uniffi-bindgen-react-native` from a git source whose prepare step shells out to `yarn build`, so `npm ci` fails without it. Hosted CI images ship yarn already, which is why this only bites on a fresh workstation.
+
 ```bash
+npm install -g yarn   # or: corepack enable
 cd mobile
 npm ci
 npx tsc --noEmit

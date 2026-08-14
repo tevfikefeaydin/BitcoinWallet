@@ -33,6 +33,14 @@ jest.mock('@react-native-clipboard/clipboard', () => ({
   getString: jest.fn(async () => ''),
 }));
 
+jest.mock('react-native-qrcode-svg', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return function MockQrCode() {
+    return React.createElement(View, { testID: 'payment-qr' });
+  };
+});
+
 jest.mock('react-native-keychain', () => {
   const secrets = new Map();
   return {

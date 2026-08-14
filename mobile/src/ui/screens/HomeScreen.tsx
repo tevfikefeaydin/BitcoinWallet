@@ -1,5 +1,6 @@
 import Clipboard from "@react-native-clipboard/clipboard";
 import React, { useCallback, useEffect, useState } from "react";
+import QRCode from "react-native-qrcode-svg";
 import {
   Image,
   Linking,
@@ -12,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { findPoisoningSuspects } from "../../core/antiPhishing";
+import { buildBitcoinPaymentUri, parseBitcoinPayment } from "../../core/bitcoinUri";
 import { APP_CONFIG } from "../../core/config";
 import {
   checkEsploraServer,
@@ -48,6 +50,7 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
   const [txs, setTxs] = useState<TxItem[]>([]);
   const [address, setAddress] = useState("");
   const [addressInfo, setAddressInfo] = useState<ReceiveAddressInfo | null>(null);
+  const [receiveAmount, setReceiveAmount] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState("");
   const [displayUnit, setDisplayUnit] = useState<BalanceUnit>("btc");
@@ -63,6 +66,10 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
   const [pendingSend, setPendingSend] = useState<PreparedSend | null>(null);
   const [confirmTail, setConfirmTail] = useState("");
   const [sendError, setSendError] = useState("");
+  const [sendAll, setSendAll] = useState(false);
+  const [paymentRequestNote, setPaymentRequestNote] = useState("");
+  const [paymentInputError, setPaymentInputError] = useState("");
+  const [selectedTx, setSelectedTx] = useState<TxItem | null>(null);
 
   const [duressPin, setDuressPin] = useState("");
   const [serverUrl, setServerUrl] = useState(APP_CONFIG.esploraServers[0].baseUrl);
@@ -166,6 +173,17 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
     }, 60_000);
   };
 
+  const copyPaymentRequest = async (paymentRequest: string) => {
+    if (!paymentRequest) return;
+    Clipboard.setString(paymentRequest);
+    setMsg("BIP21 ödeme isteği kopyalandı; pano 60 saniye sonra temizlenecek.");
+    setTimeout(async () => {
+      try {
+        if ((await Clipboard.getString()) === paymentRequest) Clipboard.setString("");
+      } catch {}
+    }, 60_000);
+  };
+
   const generateFreshAddress = async () => {
     if (!engine) return;
     setMsg("");
@@ -184,14 +202,46 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
     await WalletStore.setBalanceUnit(unit);
   };
 
-  const checkPhishing = async (value: string) => {
-    setSendTo(value);
-    const suspects = findPoisoningSuspects(value.trim(), await WalletStore.knownRecipients());
+  const applyPaymentInput = async (value: string) => {
+    setPaymentInputError("");
+    if (!value.trim()) {
+      setSendTo("");
+      setPaymentRequestNote("");
+      setPhishWarning("");
+      return;
+    }
+    let payment;
+    try {
+      payment = parseBitcoinPayment(value);
+    } catch (error) {
+      setSendTo(value);
+      setPaymentRequestNote("");
+      setPaymentInputError((error as Error).message);
+      return;
+    }
+
+    setSendTo(payment.address);
+    setPaymentRequestNote([payment.label, payment.message].filter(Boolean).join(" · "));
+    if (payment.amountSat !== undefined) {
+      setSendAmount(String(payment.amountSat));
+      setSendAll(false);
+    }
+    const suspects = findPoisoningSuspects(payment.address, await WalletStore.knownRecipients());
     setPhishWarning(
       suspects.length
         ? "Bu adres daha önce kullandığınız bir adrese tehlikeli ölçüde benziyor. Adres zehirleme riski için tamamını doğrulayın."
         : "",
     );
+  };
+
+  const pastePaymentRequest = async () => {
+    try {
+      const value = await Clipboard.getString();
+      if (!value.trim()) throw new Error("Panoda Bitcoin adresi veya ödeme isteği bulunamadı.");
+      await applyPaymentInput(value);
+    } catch (error) {
+      setPaymentInputError((error as Error).message);
+    }
   };
 
   const prepareSend = async () => {
@@ -200,7 +250,7 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
     setMsg("");
     setSendError("");
     try {
-      const prepared = await engine.prepareSend(sendTo, Number(sendAmount), Number(feeRate));
+      const prepared = await engine.prepareSend(sendTo, Number(sendAmount), Number(feeRate), sendAll);
       setConfirmTail("");
       setPendingSend(prepared);
     } catch (e) {
@@ -224,6 +274,8 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
       setMsg(`İşlem yayınlandı: ${txid.slice(0, 16)}…`);
       setSendTo("");
       setSendAmount("");
+      setSendAll(false);
+      setPaymentRequestNote("");
       setConfirmTail("");
       await refresh();
       setTab("wallet");
@@ -323,6 +375,14 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
     : Number.isSafeInteger(sendAmountSat) && sendAmountSat >= 0
       ? `${formatBtc(sendAmountSat, APP_CONFIG.ticker)}${formatUsd(sendAmountSat, fiatQuote?.usd) ? ` · ≈ ${formatUsd(sendAmountSat, fiatQuote?.usd)}` : ""}`
       : "Miktar güvenli tam satoshi aralığında olmalı.";
+  const receiveAmountSat = Number(receiveAmount);
+  const receiveAmountValid =
+    !receiveAmount ||
+    (Number.isSafeInteger(receiveAmountSat) && receiveAmountSat > 0 && receiveAmountSat <= 2_100_000_000_000_000);
+  const paymentRequestUri = address
+    ? buildBitcoinPaymentUri(address, receiveAmountValid && receiveAmount ? receiveAmountSat : undefined)
+    : "";
+  const selectedTxNet = selectedTx ? selectedTx.receivedSat - selectedTx.sentSat : 0;
 
   return (
     <View style={styles.container}>
@@ -395,6 +455,17 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
 
             <SectionHeader title="Alma adresi" action={engine?.meta.addressKind === "taproot" ? "TAPROOT" : "SEGWIT"} />
             <Card>
+              {paymentRequestUri ? (
+                <View style={styles.qrWrap}>
+                  <QRCode
+                    value={paymentRequestUri}
+                    size={188}
+                    color="#0A0B0D"
+                    backgroundColor="#FFFFFF"
+                    ecl="M"
+                  />
+                </View>
+              ) : null}
               <TouchableOpacity activeOpacity={0.72} onPress={copyAddress}>
                 <AddressText address={address || "Adres hazırlanıyor…"} large />
                 <Text style={styles.copyHint}>Dokunarak kopyala</Text>
@@ -405,6 +476,16 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
                   <Text style={styles.addressMeta}>{addressInfo.unusedCount}/{addressInfo.unusedLimit} kullanılmamış</Text>
                 </View>
               ) : null}
+              <Input
+                label="TALEP EDİLEN TUTAR · SAT (İSTEĞE BAĞLI)"
+                value={receiveAmount}
+                onChangeText={setReceiveAmount}
+                keyboardType="number-pad"
+                placeholder="Örn. 25000"
+                hint="Tutar yalnızca QR/BIP21 isteğine eklenir; gönderen son onayı kendisi verir."
+              />
+              {!receiveAmountValid ? <Text style={styles.warning}>QR tutarı pozitif bir tam satoshi değeri olmalı.</Text> : null}
+              <Btn compact label="BIP21 ödeme isteğini kopyala" onPress={() => copyPaymentRequest(paymentRequestUri)} disabled={!paymentRequestUri || !receiveAmountValid} />
               <Btn compact label="Farklı alma adresi ayır" onPress={generateFreshAddress} disabled={!engine} />
               <Text style={styles.privacyHint}>Her ödeme için farklı adres gizliliği artırır. Eski adresleriniz ödeme almaya devam eder.</Text>
             </Card>
@@ -419,11 +500,11 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
                   <TouchableOpacity
                     key={tx.txid}
                     style={[styles.txRow, index === txs.length - 1 && styles.txRowLast]}
-                    onPress={() => Linking.openURL(`${APP_CONFIG.txExplorerBase}${tx.txid}`)}
+                    onPress={() => setSelectedTx(tx)}
                   >
                     <View style={[styles.txIcon, net >= 0 ? styles.txIconIn : styles.txIconOut]}><Text style={net >= 0 ? styles.green : styles.red}>{net >= 0 ? "↓" : "↑"}</Text></View>
                     <View style={styles.txMeta}><Text style={styles.txTitle}>{net >= 0 ? "Alındı" : "Gönderildi"}</Text><Text style={styles.txId}>{tx.txid.slice(0, 8)}…{tx.txid.slice(-6)}</Text></View>
-                    <View style={styles.txRight}><Text style={[styles.txAmount, net >= 0 ? styles.green : styles.red]}>{net >= 0 ? "+" : ""}{formatBitcoin(net, displayUnit, APP_CONFIG.ticker)}</Text><Text style={[styles.txStatus, tx.confirmed ? styles.green : styles.accent]}>{tx.confirmed ? "Onaylandı" : "Bekliyor"}</Text></View>
+                    <View style={styles.txRight}><Text style={[styles.txAmount, net >= 0 ? styles.green : styles.red]}>{net >= 0 ? "+" : ""}{formatBitcoin(net, displayUnit, APP_CONFIG.ticker)}</Text><Text style={[styles.txStatus, tx.confirmed ? styles.green : styles.accent]}>{tx.confirmed ? "Onaylandı" : "Bekliyor"} · Ayrıntı ›</Text></View>
                   </TouchableOpacity>
                 );
               })}
@@ -442,10 +523,28 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
             <Card>
               {engine?.meta.watchOnly ? <Text style={styles.emptySub}>Watch-only cüzdanda özel anahtar bulunmadığı için gönderim yapılamaz.</Text> : (
                 <>
-                  <Input label="ALICI ADRESİ" value={sendTo} onChangeText={checkPhishing} placeholder={APP_CONFIG.addressPlaceholder} autoCapitalize="none" autoCorrect={false} />
+                  <Input label="ALICI ADRESİ VEYA BIP21" value={sendTo} onChangeText={applyPaymentInput} placeholder={APP_CONFIG.addressPlaceholder} autoCapitalize="none" autoCorrect={false} />
+                  <Btn compact label="Panodan adres / BIP21 al" onPress={pastePaymentRequest} />
+                  {paymentInputError ? <Text style={styles.warning}>{paymentInputError}</Text> : null}
+                  {paymentRequestNote ? <Text style={styles.paymentNote}>Ödeme isteği · {paymentRequestNote}</Text> : null}
                   {phishWarning ? <Text style={styles.warning}>{phishWarning}</Text> : null}
                   {sendTo.length > 12 ? <View style={styles.addressPreview}><AddressText address={sendTo.trim()} /></View> : null}
-                  <Input label="MİKTAR (SATOSHI)" value={sendAmount} onChangeText={setSendAmount} keyboardType="number-pad" placeholder="10000" hint={sendAmountHint} />
+                  <Input
+                    label="MİKTAR (SATOSHI)"
+                    value={sendAll ? "" : sendAmount}
+                    onChangeText={(value) => { setSendAll(false); setSendAmount(value); }}
+                    keyboardType="number-pad"
+                    placeholder={sendAll ? "Ücret düşülerek hesaplanacak" : "10000"}
+                    editable={!sendAll}
+                    hint={sendAll ? "PSBT oluşturulduğunda gerçek harcanabilir tutar ve ücret gösterilir." : sendAmountHint}
+                  />
+                  <Btn
+                    compact
+                    label={sendAll ? "MAX seçildi ✓" : "Tüm onaylı bakiyeyi gönder (MAX)"}
+                    kind={sendAll ? "primary" : "default"}
+                    onPress={() => setSendAll((current) => !current)}
+                    disabled={balance.confirmedSat <= 0}
+                  />
                   <Text style={styles.fieldLabel}>AĞ ÜCRETİ · SAT/VB</Text>
                   {fees ? <View style={styles.feeRow}>
                     {([["Ekonomik", fees.slowSatVb], ["Normal", fees.normalSatVb], ["Hızlı", fees.fastSatVb]] as const).map(([label, rate]) => (
@@ -455,7 +554,7 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
                     ))}
                   </View> : null}
                   <Input value={feeRate} onChangeText={setFeeRate} keyboardType="number-pad" placeholder="sat/vB" />
-                  <Btn label="İşlemi güvenli incele" kind="primary" onPress={prepareSend} busy={sending} disabled={!sendTo.trim() || !sendAmount || (APP_CONFIG.isMainnet && !engine?.meta.backupVerified)} />
+                  <Btn label="İşlemi güvenli incele" kind="primary" onPress={prepareSend} busy={sending} disabled={!sendTo.trim() || (!sendAmount && !sendAll) || !!paymentInputError || (APP_CONFIG.isMainnet && !engine?.meta.backupVerified)} />
                   {APP_CONFIG.isMainnet && engine && !engine.meta.backupVerified ? <Text style={styles.warning}>Önce kurtarma ifadesi yedeğinizi doğrulayın.</Text> : null}
                 </>
               )}
@@ -569,6 +668,7 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
               <InfoRow label="Miktar" value={pendingSend ? formatBtc(pendingSend.amountSat, APP_CONFIG.ticker) : ""} />
               <InfoRow label="Ağ ücreti" value={pendingSend ? `${pendingSend.feeSat.toLocaleString("tr-TR")} sat · ${pendingSend.feeRateSatVb} sat/vB` : ""} tone={feeWarning ? "red" : undefined} />
               <InfoRow label="Toplam düşecek" value={pendingSend ? formatBtc(pendingSend.amountSat + pendingSend.feeSat, APP_CONFIG.ticker) : ""} tone="accent" />
+              {pendingSend?.sendAll ? <InfoRow label="Gönderim türü" value="Tüm harcanabilir bakiye" tone="accent" /> : null}
             </View>
             {feeWarning ? <Text style={styles.warning}>Ağ ücreti gönderim miktarının %10'undan yüksek.</Text> : null}
             {phishWarning ? <Text style={styles.warning}>{phishWarning}</Text> : null}
@@ -576,6 +676,48 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
             {sendError ? <Text style={styles.warning}>{sendError}</Text> : null}
             <Btn label="İmzala ve Bitcoin ağına yayınla" kind="primary" onPress={confirmSend} busy={sending} disabled={APP_CONFIG.isMainnet && confirmTail.trim().toLowerCase() !== expectedTail.toLowerCase()} />
             <Btn label="Vazgeç" kind="ghost" onPress={() => { setPendingSend(null); setSendError(""); }} disabled={sending} />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={selectedTx !== null} transparent animationType="slide" onRequestClose={() => setSelectedTx(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHandle} />
+            <Badge label={selectedTx?.confirmed ? "ONAYLANDI" : "MEMPOOL'DA"} tone={selectedTx?.confirmed ? "green" : "accent"} />
+            <Text style={styles.modalTitle}>İşlem ayrıntıları</Text>
+            <Text style={styles.modalSub}>Tutarlar yerel cüzdan verisinden, durum ise son Esplora senkronizasyonundan alınır.</Text>
+            <View style={styles.summaryBox}>
+              <Text style={styles.modalLabel}>TXID</Text>
+              <Text selectable style={styles.txidFull}>{selectedTx?.txid}</Text>
+              <View style={styles.summaryDivider} />
+              <InfoRow
+                label="Bakiye etkisi"
+                value={`${selectedTxNet >= 0 ? "+" : ""}${formatBitcoin(selectedTxNet, displayUnit, APP_CONFIG.ticker)}`}
+                tone={selectedTxNet >= 0 ? "green" : "red"}
+              />
+              <InfoRow label="Alınan" value={selectedTx ? formatBitcoin(selectedTx.receivedSat, displayUnit, APP_CONFIG.ticker) : ""} />
+              <InfoRow label="Harcanan" value={selectedTx ? formatBitcoin(selectedTx.sentSat, displayUnit, APP_CONFIG.ticker) : ""} />
+              <InfoRow label="Ağ ücreti" value={selectedTx?.feeSat !== undefined ? formatSat(selectedTx.feeSat) : "Bilinmiyor"} />
+              <InfoRow
+                label="Zaman"
+                value={selectedTx?.timestamp ? new Date(selectedTx.timestamp * 1000).toLocaleString("tr-TR") : "Henüz blok zamanı yok"}
+              />
+            </View>
+            <Btn
+              label="Blok gezgininde doğrula"
+              kind="primary"
+              onPress={() => selectedTx && Linking.openURL(`${APP_CONFIG.txExplorerBase}${selectedTx.txid}`)}
+            />
+            <Btn
+              label="TXID'yi kopyala"
+              onPress={() => {
+                if (!selectedTx) return;
+                Clipboard.setString(selectedTx.txid);
+                setMsg("TXID panoya kopyalandı.");
+              }}
+            />
+            <Btn label="Kapat" kind="ghost" onPress={() => setSelectedTx(null)} />
           </View>
         </View>
       </Modal>
@@ -618,6 +760,7 @@ const styles = StyleSheet.create({
   copyHint: { color: colors.muted, fontSize: 11, marginTop: spacing.s },
   addressMetaRow: { flexDirection: "row", justifyContent: "space-between", marginTop: spacing.m, paddingTop: spacing.s, borderTopColor: colors.border, borderTopWidth: 1 },
   addressMeta: { color: colors.muted, fontSize: 10, fontWeight: "700" },
+  qrWrap: { alignSelf: "center", backgroundColor: "#FFFFFF", borderRadius: radius.m, padding: 14, marginBottom: spacing.l },
   privacyHint: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: spacing.s },
   empty: { alignItems: "center", paddingVertical: spacing.l },
   emptyIcon: { color: colors.muted, fontSize: 28 },
@@ -638,6 +781,7 @@ const styles = StyleSheet.create({
   pageTitle: { color: colors.text, fontSize: 29, fontWeight: "900", letterSpacing: -0.8 },
   pageSub: { color: colors.sub, fontSize: 13, lineHeight: 20, marginTop: spacing.s },
   addressPreview: { backgroundColor: colors.inputBg, borderRadius: radius.m, padding: 12, marginVertical: spacing.xs },
+  paymentNote: { color: colors.green, backgroundColor: colors.greenSoft, borderRadius: radius.m, padding: 11, fontSize: 12, lineHeight: 18, marginTop: spacing.s },
   fieldLabel: { color: colors.sub, fontSize: 12, fontWeight: "700", marginTop: spacing.m, marginBottom: spacing.s },
   feeRow: { flexDirection: "row", gap: spacing.s },
   feeChoice: { flex: 1, backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1, borderRadius: radius.m, paddingVertical: 12, alignItems: "center" },
@@ -674,6 +818,7 @@ const styles = StyleSheet.create({
   summaryBox: { backgroundColor: colors.inputBg, borderRadius: radius.l, borderColor: colors.border, borderWidth: 1, padding: spacing.m },
   modalLabel: { color: colors.muted, fontSize: 10, fontWeight: "800", letterSpacing: 0.8, marginBottom: spacing.s },
   summaryDivider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.m },
+  txidFull: { color: colors.text, fontFamily: "monospace", fontSize: 11, lineHeight: 18 },
   green: { color: colors.green },
   red: { color: colors.red },
   accent: { color: colors.accent },

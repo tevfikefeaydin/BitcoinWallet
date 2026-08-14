@@ -36,6 +36,15 @@ describe('security controls', () => {
     expect(await PinManager.verify('654321')).toBe('main');
   });
 
+  test('keeps the duress profile separate and rejects the main PIN as duress PIN', async () => {
+    await PinManager.setPin('123456');
+    await expect(PinManager.setDuressPin('123456')).rejects.toThrow('aynı olamaz');
+    await PinManager.setDuressPin('654321');
+
+    expect(await PinManager.verify('654321')).toBe('duress');
+    expect(await PinManager.verify('123456')).toBe('main');
+  });
+
   test('detects lookalike recipient addresses but not exact matches', () => {
     const known = 'tb1qabcdefghijklmno123456';
     const poisoned = 'tb1qabcdefghZZZZZZZZ123456';

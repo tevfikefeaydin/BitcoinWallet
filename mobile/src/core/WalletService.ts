@@ -37,6 +37,7 @@ export interface PreparedSend {
   amountSat: number;
   feeRateSatVb: number;
   feeSat: number;
+  sendAll: boolean;
 }
 
 export interface ReceiveAddressInfo {
@@ -316,12 +317,17 @@ export class WalletEngine {
     return { fastSatVb: at(1, 5), normalSatVb: at(6, 3), slowSatVb: at(144, 1) };
   }
 
-  async prepareSend(toAddress: string, amountSat: number, feeRateSatVb: number): Promise<PreparedSend> {
+  async prepareSend(
+    toAddress: string,
+    amountSat: number,
+    feeRateSatVb: number,
+    sendAll = false,
+  ): Promise<PreparedSend> {
     if (this.meta.watchOnly) throw new Error("Watch-only cüzdandan gönderim yapılamaz.");
     if (APP_CONFIG.isMainnet && !this.meta.backupVerified) {
       throw new Error("Kurtarma ifadesi doğrulanmadan mainnet gönderimi yapılamaz.");
     }
-    if (!Number.isSafeInteger(amountSat) || amountSat <= 0) {
+    if (!sendAll && (!Number.isSafeInteger(amountSat) || amountSat <= 0)) {
       throw new Error("Miktar pozitif bir tam satoshi değeri olmalı.");
     }
     if (!Number.isSafeInteger(feeRateSatVb) || feeRateSatVb <= 0 || feeRateSatVb > 10_000) {
@@ -340,17 +346,49 @@ export class WalletEngine {
     }
 
     const builder = new TxBuilder();
-    builder.addRecipient(address.scriptPubkey(), Amount.fromSat(BigInt(amountSat)));
+    const recipientScript = address.scriptPubkey();
+    if (sendAll) {
+      builder.drainWallet();
+      builder.drainTo(recipientScript);
+    } else {
+      builder.addRecipient(recipientScript, Amount.fromSat(BigInt(amountSat)));
+    }
     builder.feeRate(FeeRate.fromSatPerVb(BigInt(feeRateSatVb)));
     // Sıfır onaylı girdileri varsayılan olarak harcama ve işlemi BIP-125 RBF uyumlu oluştur.
     builder.excludeUnconfirmed();
     builder.setExactSequence(0xfffffffd);
     const psbt = builder.finish(this.wallet);
+    // TxBuilder değişiklik adresi türetebilir. Kullanıcı onay ekranından vazgeçse bile
+    // aynı değişiklik adresinin daha sonra tekrar kullanılmaması için staged durumu kalıcılaştır.
+    this.wallet.persist(this.persister);
     const feeSat = toSafeNumber(psbt.fee(), "Ağ ücreti");
-    if (feeSat > Math.max(amountSat, 1_000_000)) {
+    let resolvedAmountSat = amountSat;
+    if (sendAll) {
+      const target = new Uint8Array(recipientScript.toBytes());
+      const sameScript = (candidate: ArrayBuffer) => {
+        const bytes = new Uint8Array(candidate);
+        return bytes.length === target.length && bytes.every((value, index) => value === target[index]);
+      };
+      resolvedAmountSat = psbt.extractTx().output().reduce(
+        (total, output) =>
+          sameScript(output.scriptPubkey.toBytes())
+            ? total + toSafeNumber(output.value.toSat(), "Gönderim miktarı")
+            : total,
+        0,
+      );
+      if (resolvedAmountSat <= 0) throw new Error("Tüm bakiye gönderimi için harcanabilir onaylı bakiye yok.");
+    }
+    if (feeSat > Math.max(resolvedAmountSat, 1_000_000)) {
       throw new Error("Ağ ücreti güvenlik sınırını aşıyor; ücret oranını ve miktarı kontrol edin.");
     }
-    return { psbt, toAddress: normalizedAddress, amountSat, feeRateSatVb, feeSat };
+    return {
+      psbt,
+      toAddress: normalizedAddress,
+      amountSat: resolvedAmountSat,
+      feeRateSatVb,
+      feeSat,
+      sendAll,
+    };
   }
 
   async broadcastPrepared(prepared: PreparedSend): Promise<string> {

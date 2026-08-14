@@ -22,6 +22,9 @@ The tested ARM64 APK is published under [GitHub Releases](https://github.com/tev
 - Exact BTC/SAT accounting with display-only USD estimates
 - Mainnet-verified Esplora health checks, automatic fallback and custom HTTPS endpoints
 - Controlled receive-address rotation with derivation index and unused-address cap
+- BIP21 payment requests with on-screen QR codes and strict URI parsing on paste
+- Send-max drain transactions with the real spendable amount resolved from the PSBT
+- Transaction detail sheet with local amounts, fee, timestamp and explorer verification
 - Screenshot/overlay protections, recipient-tail confirmation, RBF and fee limits
 
 ## Validation

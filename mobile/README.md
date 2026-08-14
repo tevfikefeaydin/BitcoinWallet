@@ -75,4 +75,5 @@ Dört değişkenden biri eksikse `hasReleaseSigning` false olur ve varyant imzas
 - Root/jailbreak, kötü amaçlı klavye, zararlı erişilebilirlik servisi, değiştirilmiş APK, işletim sistemi açığı ve kurtarma ifadesi oltalaması risk olmaya devam eder.
 - Donanım Keystore bulunmadığında şifreli yazılım Keystore seviyesine düşülebilir; bu durum arayüzde gösterilir.
 - Mainnet APK ARM64 cihazlarla sınırlıdır.
+- `npm audit` şu anda 10 high uyarı bildirir; hepsi Metro'nun `image-size` bağımlılığındaki tek bir açığın bağımlılık ağacında yukarı yayılmasıdır. Bu paket yalnızca derleme zamanında çalışır, APK'ya girmez ve upstream'de henüz yaması yoktur. **`npm audit fix --force` çalıştırmayın**: önerdiği "düzeltme" React Native'i 0.86.2'den 0.72.17'ye düşürmektir.
 - Proje bağımsız güvenlik denetiminden geçmemiştir. Gerçek değerle kullanmadan önce [`../SECURITY_PREAUDIT_0.3.0.md`](../SECURITY_PREAUDIT_0.3.0.md) belgesindeki açık maddeleri inceleyin.

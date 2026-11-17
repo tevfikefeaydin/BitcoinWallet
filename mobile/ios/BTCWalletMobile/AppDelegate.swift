@@ -5,12 +5,11 @@ import ReactAppDependencyProvider
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
+  // Pencereyi SceneDelegate oluşturur; React Native'in bazı yardımcıları hâlâ buradan okur.
   var window: UIWindow?
 
   var reactNativeDelegate: ReactNativeDelegate?
   var reactNativeFactory: RCTReactNativeFactory?
-
-  private var privacyShield: UIView?
 
   func application(
     _ application: UIApplication,
@@ -23,12 +22,45 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     reactNativeDelegate = delegate
     reactNativeFactory = factory
 
-    window = UIWindow(frame: UIScreen.main.bounds)
+    return true
+  }
+
+  // MARK: - Klavye
+
+  /// Üçüncü taraf klavyeler kurtarma ifadesini ve PIN'i görebilir; yalnızca sistem klavyesine izin ver.
+  func application(
+    _ application: UIApplication,
+    shouldAllowExtensionPointIdentifier extensionPointIdentifier: UIApplication.ExtensionPointIdentifier
+  ) -> Bool {
+    extensionPointIdentifier != .keyboard
+  }
+}
+
+/// iOS 27 SDK'sı UIScene yaşam döngüsünü zorunlu kılar; sahne benimsemeyen uygulamalar açılışta sonlandırılır.
+/// Pencere ve React Native kök görünümü burada kurulur (Info.plist → UIApplicationSceneManifest).
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+  var window: UIWindow?
+
+  private var privacyShield: UIView?
+
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    guard let windowScene = scene as? UIWindowScene,
+          let appDelegate = UIApplication.shared.delegate as? AppDelegate,
+          let factory = appDelegate.reactNativeFactory
+    else { return }
+
+    let window = UIWindow(windowScene: windowScene)
+    self.window = window
+    appDelegate.window = window
 
     factory.startReactNative(
       withModuleName: "BTCWalletMobile",
       in: window,
-      launchOptions: launchOptions
+      launchOptions: nil
     )
 
 #if !DEBUG
@@ -40,32 +72,29 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       name: UIScreen.capturedDidChangeNotification,
       object: nil
     )
-    updatePrivacyShield(inactive: false)
 #endif
-
-    return true
   }
 
   // MARK: - Gizlilik perdesi
 
   /// Uygulama değiştirici önizlemesine mnemonic, bakiye veya adres düşmesin.
-  func applicationWillResignActive(_ application: UIApplication) {
+  func sceneWillResignActive(_ scene: UIScene) {
     updatePrivacyShield(inactive: true)
   }
 
-  func applicationDidBecomeActive(_ application: UIApplication) {
+  func sceneDidBecomeActive(_ scene: UIScene) {
     updatePrivacyShield(inactive: false)
   }
 
   @objc private func screenCaptureDidChange() {
-    updatePrivacyShield(inactive: UIApplication.shared.applicationState != .active)
+    updatePrivacyShield(inactive: window?.windowScene?.activationState != .foregroundActive)
   }
 
   private func updatePrivacyShield(inactive: Bool) {
 #if DEBUG
     let captured = false
 #else
-    let captured = UIScreen.main.isCaptured
+    let captured = window?.windowScene?.screen.isCaptured ?? false
 #endif
     guard inactive || captured else {
       privacyShield?.removeFromSuperview()
@@ -91,16 +120,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     window.addSubview(shield)
     privacyShield = shield
-  }
-
-  // MARK: - Klavye
-
-  /// Üçüncü taraf klavyeler kurtarma ifadesini ve PIN'i görebilir; yalnızca sistem klavyesine izin ver.
-  func application(
-    _ application: UIApplication,
-    shouldAllowExtensionPointIdentifier extensionPointIdentifier: UIApplication.ExtensionPointIdentifier
-  ) -> Bool {
-    extensionPointIdentifier != .keyboard
   }
 }
 

@@ -109,7 +109,7 @@ npm run ios:mainnet
 
 Ağ, derleme ayarı `BITCOIN_NETWORK` → `Info.plist` (`BTCBitcoinNetwork`) → native `Kdf` modülü yoluyla JS'e ulaşır; değer okunamazsa uygulama testnet'te kalır. İki uygulama yan yana kurulabilir ve Keychain kayıtlarını paylaşmaz.
 
-Android ile aynı arayüzü sunan native modül `ios/BTCWalletMobile/KdfModule.m` dosyasındadır (CommonCrypto PBKDF2, BDK veritabanı yolu, ağ sabiti). Gizlilik perdesi ve klavye kısıtı `AppDelegate.swift` içindedir.
+Android ile aynı arayüzü sunan native modül `ios/BTCWalletMobile/KdfModule.m` dosyasındadır (CommonCrypto PBKDF2, BDK veritabanı yolu, ağ sabiti). Pencere kurulumu (UIScene), gizlilik perdesi ve klavye kısıtı `AppDelegate.swift` içindedir.
 
 Gerçek cihaz için Xcode'da hedefin *Signing & Capabilities* sekmesinden kendi Team'inizi seçin; depo bilerek `DEVELOPMENT_TEAM` içermez. Uygulama yalnızca iPhone hedefler (iPad'de uyumluluk modunda çalışır) ve dikey yöne kilitlidir.
 

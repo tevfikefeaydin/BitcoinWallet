@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { AppState, StatusBar, StyleSheet, Text, View } from "react-native";
 import { uniffiInitAsync } from "bdk-rn";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { reconcileInstallState } from "./src/core/InstallState";
 import { PinManager } from "./src/core/PinManager";
 import { WalletStore } from "./src/core/WalletStore";
 import { AUTO_LOCK_SECONDS, type Profile } from "./src/core/types";
@@ -27,6 +28,7 @@ export default function App() {
     (async () => {
       try {
         await uniffiInitAsync();
+        await reconcileInstallState();
         const hasPin = await PinManager.isConfigured();
         const wallets = await WalletStore.list();
         if (!hasPin || wallets.length === 0) setPhase("onboarding");
@@ -55,7 +57,8 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.safeArea}>
+      {/* Alt kenar ekranlara bırakılır: sekme çubuğu ve alt sayfalar home indicator alanını kendi zeminleriyle doldurur. */}
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
         <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
         {fatalError ? (
           <View style={styles.fatal}>

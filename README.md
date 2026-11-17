@@ -3,7 +3,7 @@
 [![CI](https://github.com/tevfikefeaydin/BitcoinWallet/actions/workflows/ci.yml/badge.svg)](https://github.com/tevfikefeaydin/BitcoinWallet/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Self-custody Bitcoin wallet project. The primary deliverable is the React Native Android app in [`mobile/`](mobile/); the repository root also contains the companion Vite web prototype.
+Self-custody Bitcoin wallet project. The primary deliverable is the React Native app in [`mobile/`](mobile/), which targets Android and iOS from one codebase (iOS setup is described in [`mobile/README.md`](mobile/README.md)); the repository root also contains the companion Vite web prototype.
 
 ## Android mainnet release
 

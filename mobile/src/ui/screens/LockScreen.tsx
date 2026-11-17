@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
+import { Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { APP_CONFIG } from "../../core/config";
 import { PinManager } from "../../core/PinManager";
 import type { Profile } from "../../core/types";
@@ -33,7 +33,9 @@ export function LockScreen({ onUnlock, onRecover }: { onUnlock: (profile: Profil
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      {/* iOS sayısal klavyesinde kapatma tuşu yok: boş alana dokunmak klavyeyi kapatır. */}
+      <Pressable style={styles.container} onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.brand}>
         <Image source={require("../../../assets/branding/btcwallet-logo-v1.png")} style={styles.logo} />
         <Badge label={APP_CONFIG.networkLabel} tone={APP_CONFIG.isMainnet ? "red" : "accent"} />
@@ -57,12 +59,14 @@ export function LockScreen({ onUnlock, onRecover }: { onUnlock: (profile: Profil
         <Btn label="PIN'i unuttum" kind="ghost" onPress={onRecover} disabled={busy} />
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </Card>
-      <View style={styles.securityLine}><View style={styles.securityDot} /><Text style={styles.securityText}>Yerel şifreleme · Otomatik kilit · Ekran koruması</Text></View>
+      <View style={styles.securityLine}><View style={styles.securityDot} /><Text style={styles.securityText}>Yerel şifreleme · Otomatik kilit · {Platform.OS === "ios" ? "Önizleme gizleme" : "Ekran koruması"}</Text></View>
+      </Pressable>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1, backgroundColor: colors.bg, justifyContent: "center", padding: spacing.l },
   brand: { alignItems: "center", marginBottom: spacing.l },
   logo: { width: 66, height: 66, borderRadius: radius.l, backgroundColor: colors.black, marginBottom: spacing.m },

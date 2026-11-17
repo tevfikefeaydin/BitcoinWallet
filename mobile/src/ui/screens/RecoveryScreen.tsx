@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { PinManager } from "../../core/PinManager";
-import { Btn, Card, Input } from "../components";
+import { Btn, Card, Input, ScreenScroll } from "../components";
 import { colors, radius, spacing } from "../theme";
 
 export function RecoveryScreen({ onRecovered, onCancel }: { onRecovered: () => void; onCancel: () => void }) {
@@ -29,7 +29,7 @@ export function RecoveryScreen({ onRecovered, onCancel }: { onRecovered: () => v
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScreenScroll style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.icon}><Text style={styles.iconText}>↺</Text></View>
       <Text style={styles.h1}>Cüzdan erişimini kurtarın</Text>
       <Text style={styles.lead}>Cihazdaki cüzdanlardan birinin 12 kelimesini doğrulayarak kilidi kaldırın ve yeni PIN belirleyin.</Text>
@@ -41,7 +41,7 @@ export function RecoveryScreen({ onRecovered, onCancel }: { onRecovered: () => v
         <Btn label="Vazgeç" kind="ghost" onPress={onCancel} disabled={busy} />
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </Card>
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 

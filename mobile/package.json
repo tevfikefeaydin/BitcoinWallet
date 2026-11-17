@@ -6,6 +6,7 @@
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
+    "ios:mainnet": "react-native run-ios --scheme BTCWalletMobile-Mainnet --mode Mainnet",
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest"

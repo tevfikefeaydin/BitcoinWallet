@@ -56,3 +56,46 @@ jobs:
         with:
           ruby-version: "3.3"
       - run: bundle install --jobs 4 --retry 3
+
+  ios-build:
+    name: iOS simulator build
+    runs-on: macos-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+      - run: npm ci
+      - run: bundle install --jobs 4 --retry 3
+      - name: Install pods
+        working-directory: mobile/ios
+        run: bundle exec pod install
+      - name: Build testnet (Debug)
+        working-directory: mobile/ios
+        run: >
+          xcodebuild build -quiet
+          -workspace BTCWalletMobile.xcworkspace
+          -scheme BTCWalletMobile
+          -configuration Debug
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+      - name: Build mainnet (Mainnet)
+        working-directory: mobile/ios
+        run: >
+          xcodebuild build -quiet
+          -workspace BTCWalletMobile.xcworkspace
+          -scheme BTCWalletMobile-Mainnet
+          -configuration Mainnet
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO

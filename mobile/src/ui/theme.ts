@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 export const colors = {
   bg: "#070A0F",
   surface: "#0D121A",
@@ -22,4 +24,7 @@ export const colors = {
 };
 
 export const spacing = { xs: 4, s: 8, m: 16, l: 24, xl: 32, xxl: 40 };
+// "monospace" yalnızca Android'de geçerli bir aile adıdır; iOS'ta Menlo kullanılır.
+export const monoFont = Platform.select({ ios: "Menlo", default: "monospace" });
+
 export const radius = { s: 10, m: 16, l: 22, pill: 999 };

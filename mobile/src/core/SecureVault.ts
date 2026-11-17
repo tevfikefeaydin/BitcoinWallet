@@ -1,6 +1,8 @@
 // Sır saklama katmanı: mnemonic'ler ve PIN kayıtları react-native-keychain ile
-// Android Keystore (donanım destekli, StrongBox varsa onda) içinde şifrelenir.
+// Android'de Keystore (donanım destekli, StrongBox varsa onda), iOS'ta ise
+// Keychain (yalnızca bu cihaz, kilit açıkken erişilebilir; iCloud'a taşınmaz) içinde saklanır.
 // Sırlar asla AsyncStorage'a veya düz metin dosyaya yazılmaz.
+import { Platform } from "react-native";
 import * as Keychain from "react-native-keychain";
 import { APP_CONFIG } from "./config";
 
@@ -11,6 +13,11 @@ async function setSecret(key: string, value: string): Promise<void> {
     service: `${SERVICE_PREFIX}.${key}`,
     accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   };
+  if (Platform.OS !== "android") {
+    // securityLevel Android'e özgüdür; iOS Keychain öğeleri cihazın donanım anahtarına bağlıdır.
+    await Keychain.setGenericPassword(key, value, base);
+    return;
+  }
   try {
     // Önce donanım destekli Keystore (StrongBox/TEE) dene
     await Keychain.setGenericPassword(key, value, {
@@ -45,7 +52,23 @@ export const SecureVault = {
   getPinRecord: () => getSecret("pin"),
   deletePinRecord: () => deleteSecret("pin"),
 
+  /** Bu uygulamanın (geçerli ağ önekiyle) kasada tuttuğu tüm kayıtların servis adları. */
+  async listServices(): Promise<string[]> {
+    const services = await Keychain.getAllGenericPasswordServices();
+    return services.filter((service) => service.startsWith(`${SERVICE_PREFIX}.`));
+  },
+
+  async deleteService(service: string): Promise<void> {
+    if (!service.startsWith(`${SERVICE_PREFIX}.`)) throw new Error("Yabancı kasa kaydı silinemez.");
+    await Keychain.resetGenericPassword({ service });
+  },
+
   async securityLevel(): Promise<"hardware" | "software" | "unknown"> {
+    if (Platform.OS === "ios") {
+      // Gerçek cihazlarda Keychain, Secure Enclave'e bağlı anahtarlarla şifrelenir;
+      // simülatörde bu donanım yoktur.
+      return APP_CONFIG.isSimulator ? "software" : "hardware";
+    }
     try {
       const level = await Keychain.getSecurityLevel();
       if (level === Keychain.SECURITY_LEVEL.SECURE_HARDWARE) return "hardware";

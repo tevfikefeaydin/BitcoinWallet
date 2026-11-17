@@ -14,6 +14,12 @@ if linkage != nil
   use_frameworks! :linkage => linkage.to_sym
 end
 
+# Mainnet, Release ile aynı şekilde derlenen ayrı bir yapılandırmadır (ayrı bundle ID ve ağ).
+project 'BTCWalletMobile',
+  'Debug' => :debug,
+  'Release' => :release,
+  'Mainnet' => :release
+
 target 'BTCWalletMobile' do
   config = use_native_modules!
 

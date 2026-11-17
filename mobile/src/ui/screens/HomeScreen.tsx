@@ -3,8 +3,10 @@ import React, { useCallback, useEffect, useState } from "react";
 import QRCode from "react-native-qrcode-svg";
 import {
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -12,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { findPoisoningSuspects } from "../../core/antiPhishing";
 import { buildBitcoinPaymentUri, parseBitcoinPayment } from "../../core/bitcoinUri";
 import { APP_CONFIG } from "../../core/config";
@@ -37,12 +40,13 @@ import type {
   TxItem,
   WalletMeta,
 } from "../../core/types";
-import { AddressText, Badge, Btn, Card, InfoRow, Input, SectionHeader } from "../components";
-import { colors, radius, spacing } from "../theme";
+import { AddressText, Badge, Btn, Card, InfoRow, Input, SectionHeader, keyboardScrollProps } from "../components";
+import { colors, monoFont, radius, spacing } from "../theme";
 
 type Tab = "wallet" | "send" | "settings";
 
 export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWallet: (profile?: Profile) => void }) {
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>("wallet");
   const [wallets, setWallets] = useState<WalletMeta[]>([]);
   const [engine, setEngine] = useState<WalletEngine | null>(null);
@@ -400,6 +404,7 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={syncing} onRefresh={refresh} tintColor={colors.accent} colors={[colors.accent]} />}
         keyboardShouldPersistTaps="handled"
+        {...keyboardScrollProps}
       >
         {tab === "wallet" ? (
           <>
@@ -567,8 +572,12 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
             <View style={styles.pageIntro}><Text style={styles.pageTitle}>Güvenlik ve ağ</Text><Text style={styles.pageSub}>Cüzdanın güvenlik durumu ve Bitcoin veri kaynağı.</Text></View>
             <Card title="Güvenlik durumu">
               <InfoRow label="Bitcoin ağı" value={APP_CONFIG.networkLabel} tone={APP_CONFIG.isMainnet ? "red" : "accent"} />
-              <InfoRow label="Anahtar kasası" value={vaultLevel === "hardware" ? "Donanım destekli" : vaultLevel === "software" ? "Yazılım Keystore" : "Doğrulanamadı"} tone={vaultLevel === "hardware" ? "green" : "red"} />
-              <InfoRow label="Ekran görüntüsü" value="Engellendi" tone="green" />
+              <InfoRow label="Anahtar kasası" value={vaultLevel === "hardware" ? "Donanım destekli" : vaultLevel === "software" ? (Platform.OS === "ios" ? "Simülatör (yazılım)" : "Yazılım Keystore") : "Doğrulanamadı"} tone={vaultLevel === "hardware" ? "green" : "red"} />
+              {Platform.OS === "ios" ? (
+                <InfoRow label="Önizleme ve ekran kaydı" value="Gizleniyor" tone="green" />
+              ) : (
+                <InfoRow label="Ekran görüntüsü" value="Engellendi" tone="green" />
+              )}
               <InfoRow label="Otomatik kilit" value="60 saniye" tone="green" />
               <InfoRow label="Yedek doğrulaması" value={engine?.meta.backupVerified ? "Tamamlandı" : "Eksik"} tone={engine?.meta.backupVerified ? "green" : "red"} />
               {vaultLevel !== "hardware" ? <Text style={styles.warning}>Bu cihaz donanım destekli anahtar korumasını doğrulamadı. Mainnet için küçük miktar kullanın.</Text> : null}
@@ -645,7 +654,7 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
         {msg ? <Text style={[styles.message, messageIsError && styles.messageError]}>{msg}</Text> : null}
       </ScrollView>
 
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { paddingBottom: Math.max(6, insets.bottom) }]}>
         {([['wallet', '◈', 'Cüzdan'], ['send', '↗', 'Gönder'], ['settings', '⚙', 'Ayarlar']] as const).map(([key, icon, label]) => (
           <TouchableOpacity accessibilityRole="button" key={key} style={styles.tabBtn} onPress={() => setTab(key)}>
             <Text style={[styles.tabIcon, tab === key && styles.tabActive]}>{icon}</Text>
@@ -655,8 +664,8 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
       </View>
 
       <Modal visible={pendingSend !== null} transparent animationType="slide" onRequestClose={() => !sending && setPendingSend(null)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+        <KeyboardAvoidingView style={[styles.modalBackdrop, { paddingTop: insets.top }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <View style={[styles.modalCard, { paddingBottom: Math.max(spacing.xl, insets.bottom + spacing.m) }]}>
             <View style={styles.modalHandle} />
             <Badge label="SON KONTROL" tone="accent" />
             <Text style={styles.modalTitle}>İşlemi imzalayın</Text>
@@ -677,12 +686,12 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
             <Btn label="İmzala ve Bitcoin ağına yayınla" kind="primary" onPress={confirmSend} busy={sending} disabled={APP_CONFIG.isMainnet && confirmTail.trim().toLowerCase() !== expectedTail.toLowerCase()} />
             <Btn label="Vazgeç" kind="ghost" onPress={() => { setPendingSend(null); setSendError(""); }} disabled={sending} />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={selectedTx !== null} transparent animationType="slide" onRequestClose={() => setSelectedTx(null)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+        <KeyboardAvoidingView style={[styles.modalBackdrop, { paddingTop: insets.top }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <View style={[styles.modalCard, { paddingBottom: Math.max(spacing.xl, insets.bottom + spacing.m) }]}>
             <View style={styles.modalHandle} />
             <Badge label={selectedTx?.confirmed ? "ONAYLANDI" : "MEMPOOL'DA"} tone={selectedTx?.confirmed ? "green" : "accent"} />
             <Text style={styles.modalTitle}>İşlem ayrıntıları</Text>
@@ -719,7 +728,7 @@ export function HomeScreen({ profile, onAddWallet }: { profile: Profile; onAddWa
             />
             <Btn label="Kapat" kind="ghost" onPress={() => setSelectedTx(null)} />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -773,7 +782,7 @@ const styles = StyleSheet.create({
   txIconOut: { backgroundColor: colors.redSoft },
   txMeta: { flex: 1 },
   txTitle: { color: colors.text, fontSize: 14, fontWeight: "700" },
-  txId: { color: colors.muted, fontFamily: "monospace", fontSize: 10, marginTop: 3 },
+  txId: { color: colors.muted, fontFamily: monoFont, fontSize: 10, marginTop: 3 },
   txRight: { alignItems: "flex-end", maxWidth: "46%" },
   txAmount: { fontSize: 12, fontWeight: "800" },
   txStatus: { fontSize: 10, marginTop: 4, fontWeight: "700" },
@@ -811,14 +820,14 @@ const styles = StyleSheet.create({
   tabLabel: { color: colors.muted, fontSize: 10, fontWeight: "700", marginTop: 2 },
   tabActive: { color: colors.accent },
   modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: "flex-end" },
-  modalCard: { maxHeight: "94%", backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderColor: colors.borderStrong, borderWidth: 1, padding: spacing.l, paddingBottom: spacing.xl },
+  modalCard: { maxHeight: "100%", backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderColor: colors.borderStrong, borderWidth: 1, padding: spacing.l, paddingBottom: spacing.xl },
   modalHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, alignSelf: "center", marginBottom: spacing.l },
   modalTitle: { color: colors.text, fontSize: 27, fontWeight: "900", letterSpacing: -0.6, marginTop: spacing.s },
   modalSub: { color: colors.sub, fontSize: 12, lineHeight: 18, marginTop: spacing.xs, marginBottom: spacing.m },
   summaryBox: { backgroundColor: colors.inputBg, borderRadius: radius.l, borderColor: colors.border, borderWidth: 1, padding: spacing.m },
   modalLabel: { color: colors.muted, fontSize: 10, fontWeight: "800", letterSpacing: 0.8, marginBottom: spacing.s },
   summaryDivider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.m },
-  txidFull: { color: colors.text, fontFamily: "monospace", fontSize: 11, lineHeight: 18 },
+  txidFull: { color: colors.text, fontFamily: monoFont, fontSize: 11, lineHeight: 18 },
   green: { color: colors.green },
   red: { color: colors.red },
   accent: { color: colors.accent },

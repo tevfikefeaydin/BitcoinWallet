@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Platform, StyleSheet, Text, View } from "react-native";
 import { APP_CONFIG } from "../../core/config";
 import { PinManager } from "../../core/PinManager";
 import { SecureVault } from "../../core/SecureVault";
 import { WalletEngine } from "../../core/WalletService";
 import { WalletStore } from "../../core/WalletStore";
 import type { AddressKind, Profile } from "../../core/types";
-import { Badge, Btn, Card, Input } from "../components";
+import { Badge, Btn, Card, Input, ScreenScroll } from "../components";
 import { colors, radius, spacing } from "../theme";
 
 type Step = "risk" | "pin" | "choose" | "backup" | "verify";
@@ -138,23 +138,27 @@ export function OnboardingScreen({ profile, onDone }: { profile: Profile; onDone
 
   if (step === "risk") {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScreenScroll style={styles.container} contentContainerStyle={styles.content}>
         <ScreenTitle eyebrow="GERÇEK BITCOIN AĞI" title="Mainnet'e hoş geldiniz" subtitle="Bu sürüm gerçek BTC ile gerçek işlemler oluşturur. Önce güvenlik sınırlarını açıkça kabul edin." />
         <Card variant="warning" title="Kayıp işlemler geri alınamaz">
           <Text style={styles.warningText}>• İlk denemeyi çok küçük bir miktarla yapın.</Text>
           <Text style={styles.warningText}>• 12 kelimeyi çevrimdışı ve fiziksel olarak saklayın.</Text>
-          <Text style={styles.warningText}>• Root'lu cihaz, ekran paylaşımı ve bilinmeyen APK kaynaklarından kaçının.</Text>
+          <Text style={styles.warningText}>
+            {Platform.OS === "ios"
+              ? "• Jailbreak'li cihaz, ekran paylaşımı/kaydı ve resmi olmayan uygulama kaynaklarından kaçının."
+              : "• Root'lu cihaz, ekran paylaşımı ve bilinmeyen APK kaynaklarından kaçının."}
+          </Text>
           <Text style={styles.warningText}>• Bu ön sürüm bağımsız güvenlik denetiminden geçmiş değildir.</Text>
         </Card>
         <Btn label="Riskleri anladım, devam et" kind="primary" onPress={() => setStep(pinConfigured ? "choose" : "pin")} />
         {error ? <Text style={styles.error}>{error}</Text> : null}
-      </ScrollView>
+      </ScreenScroll>
     );
   }
 
   if (step === "pin") {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScreenScroll style={styles.container} contentContainerStyle={styles.content}>
         <ScreenTitle eyebrow={`${APP_CONFIG.networkLabel} • ADIM 1/2`} title="Kasayı kilitleyin" subtitle="PIN, cihazdaki şifreli anahtar kasasına erişimi korur. Benzersiz ve tahmin edilmesi zor bir sayı seçin." />
         <Card title="Güvenli PIN" subtitle="Beş hatalı denemeden sonra yalnızca kurtarma ifadenizle sıfırlanabilir.">
           <Input label="PIN" value={pin} onChangeText={setPin} placeholder="6–8 hane" secureTextEntry keyboardType="number-pad" maxLength={8} />
@@ -162,13 +166,13 @@ export function OnboardingScreen({ profile, onDone }: { profile: Profile; onDone
           <Btn label="PIN'i güvenli kaydet" kind="primary" onPress={savePin} busy={busy} disabled={pin.length < 6 || pin2.length < 6} />
         </Card>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-      </ScrollView>
+      </ScreenScroll>
     );
   }
 
   if (step === "backup") {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScreenScroll style={styles.container} contentContainerStyle={styles.content}>
         <ScreenTitle eyebrow="YEDEKLEME • ADIM 1/2" title="12 kelimeyi çevrimdışı yazın" subtitle="Bu kelimeler paranızın tek kurtarma anahtarıdır. Fotoğrafını çekmeyin, buluta veya mesaja kaydetmeyin." />
         <Card variant="hero">
           <View style={styles.words}>
@@ -182,13 +186,13 @@ export function OnboardingScreen({ profile, onDone }: { profile: Profile; onDone
         </Card>
         <Btn label="Yazdım, kelimeleri doğrula" kind="primary" onPress={() => { setError(""); setStep("verify"); }} />
         {error ? <Text style={styles.error}>{error}</Text> : null}
-      </ScrollView>
+      </ScreenScroll>
     );
   }
 
   if (step === "verify") {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScreenScroll style={styles.container} contentContainerStyle={styles.content}>
         <ScreenTitle eyebrow="YEDEKLEME • ADIM 2/2" title="Kağıt yedeğinizi doğrulayın" subtitle="İstenen üç kelimeyi yedeğinizden girin. Bu adım tamamlanmadan mainnet gönderimi açılmaz." />
         <Card title="Eksik kelimeler">
           {VERIFY_INDEXES.map((wordIndex, inputIndex) => (
@@ -206,12 +210,12 @@ export function OnboardingScreen({ profile, onDone }: { profile: Profile; onDone
           <Btn label="Kelimelere geri dön" kind="ghost" onPress={() => setStep("backup")} disabled={busy} />
         </Card>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-      </ScrollView>
+      </ScreenScroll>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScreenScroll style={styles.container} contentContainerStyle={styles.content}>
       <ScreenTitle eyebrow={`${APP_CONFIG.networkLabel} • ADIM 2/2`} title="Cüzdanınızı seçin" subtitle="Yeni bir anahtar üretin, mevcut 12 kelimenizi geri yükleyin veya yalnızca izleme cüzdanı ekleyin." />
 
       <Card title="Adres standardı" subtitle="Taproot daha modern ve verimlidir; SegWit geniş uyumluluk sağlar.">
@@ -236,7 +240,7 @@ export function OnboardingScreen({ profile, onDone }: { profile: Profile; onDone
       </Card>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 

@@ -1,10 +1,15 @@
-import { NativeModules, Platform } from "react-native";
+import { NativeModules } from "react-native";
 import { Network, NetworkKind } from "bdk-rn";
 import type { BitcoinNetworkName, EsploraServer } from "./types";
 
+// Android: KdfModule.kt · iOS: ios/BTCWalletMobile/KdfModule.m — aynı arayüz.
 type KdfNativeModule = {
   bitcoinNetwork?: string;
+  /** Yalnızca iOS: simülatörde Secure Enclave bulunmaz. */
+  isSimulator?: boolean;
   getWalletDatabasePath?(walletId: string): Promise<string>;
+  /** Yalnızca iOS: kurulum başına bir kez true döner. */
+  consumeFreshInstallFlag?(): Promise<boolean>;
 };
 
 const native = NativeModules.Kdf as KdfNativeModule | undefined;
@@ -36,9 +41,16 @@ export const APP_CONFIG = Object.freeze({
   txExplorerBase: isMainnet ? "https://mempool.space/tx/" : "https://mempool.space/testnet/tx/",
   // Eski testnet kurulumları geriye dönük uyumlu kalır; mainnet hiçbir anahtarı paylaşmaz.
   storagePrefix: isMainnet ? "btcwallet.mainnet" : "btcwallet",
+  isSimulator: native?.isSimulator === true,
 });
 
 export async function walletDatabasePath(walletId: string): Promise<string | null> {
-  if (Platform.OS !== "android" || !native?.getWalletDatabasePath) return null;
+  if (!native?.getWalletDatabasePath) return null;
   return native.getWalletDatabasePath(walletId);
+}
+
+/** iOS'ta uygulamanın bu kurulumdaki ilk açılışı mı? Diğer platformlarda her zaman false. */
+export async function consumeFreshInstallFlag(): Promise<boolean> {
+  if (!native?.consumeFreshInstallFlag) return false;
+  return (await native.consumeFreshInstallFlag()) === true;
 }

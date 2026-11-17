@@ -1,17 +1,43 @@
 import React from "react";
 import {
   ActivityIndicator,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ScrollViewProps,
   type StyleProp,
   type TextInputProps,
   type ViewStyle,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { splitForDisplay } from "../core/antiPhishing";
-import { colors, radius, spacing } from "./theme";
+import { colors, monoFont, radius, spacing } from "./theme";
+
+/**
+ * iOS'ta sayısal klavyede "bitti" tuşu yoktur ve klavye içeriği kendiliğinden itmez:
+ * kaydırarak kapatma ve otomatik klavye boşluğu açılır. Android bu işi adjustResize ile yapar.
+ */
+export const keyboardScrollProps: Pick<ScrollViewProps, "automaticallyAdjustKeyboardInsets" | "keyboardDismissMode"> =
+  Platform.OS === "ios" ? { automaticallyAdjustKeyboardInsets: true, keyboardDismissMode: "interactive" } : {};
+
+/** Tam ekran kaydırılabilir sayfa: klavye davranışı ve alt güvenli alan (home indicator / gezinme çubuğu) dahil. */
+export function ScreenScroll({ contentContainerStyle, children, ...rest }: ScrollViewProps) {
+  const insets = useSafeAreaInsets();
+  return (
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      {...keyboardScrollProps}
+      {...rest}
+      contentContainerStyle={[contentContainerStyle, { paddingBottom: spacing.xxl + insets.bottom }]}
+    >
+      {children}
+    </ScrollView>
+  );
+}
 
 export function Card({
   title,
@@ -97,6 +123,14 @@ export function Input(props: TextInputProps & { label?: string; hint?: string })
       <TextInput
         placeholderTextColor={colors.muted}
         selectionColor={colors.accent}
+        keyboardAppearance="dark"
+        // Adres, descriptor ve kurtarma kelimeleri klavye sözlüğüne/önerilerine girmesin.
+        autoCorrect={false}
+        spellCheck={false}
+        autoComplete="off"
+        // iOS, art arda gelen gizli alanları "parola oluşturma formu" sanıp Güçlü Parola
+        // katmanını gösterir ve PIN'i iCloud Anahtar Zinciri'ne kaydetmeyi önerir; bunu kapat.
+        textContentType={props.secureTextEntry ? "oneTimeCode" : "none"}
         {...props}
         style={[styles.input, props.multiline && styles.inputMultiline, props.style]}
       />
@@ -236,7 +270,7 @@ export const styles = StyleSheet.create({
   infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10 },
   infoLabel: { color: colors.sub, fontSize: 13 },
   infoValue: { color: colors.text, fontSize: 13, fontWeight: "700" },
-  addr: { color: colors.text, fontFamily: "monospace", fontSize: 13, lineHeight: 21 },
+  addr: { color: colors.text, fontFamily: monoFont, fontSize: 13, lineHeight: 21 },
   addrLarge: { fontSize: 15, lineHeight: 24 },
   addrStrong: { color: colors.accent, fontWeight: "800" },
   addrDim: { color: colors.sub },

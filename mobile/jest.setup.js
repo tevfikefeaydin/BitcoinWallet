@@ -52,6 +52,7 @@ jest.mock('react-native-keychain', () => {
     }),
     getGenericPassword: jest.fn(async (options) => secrets.get(options.service) ?? false),
     resetGenericPassword: jest.fn(async (options) => secrets.delete(options.service)),
+    getAllGenericPasswordServices: jest.fn(async () => [...secrets.keys()]),
     getSecurityLevel: jest.fn(async () => 'SECURE_HARDWARE'),
   };
 });
@@ -59,6 +60,7 @@ jest.mock('react-native-keychain', () => {
 const { NativeModules } = require('react-native');
 NativeModules.Kdf = {
   bitcoinNetwork: 'testnet',
+  consumeFreshInstallFlag: jest.fn(async () => false),
   getWalletDatabasePath: jest.fn(async (walletId) => `/test/${walletId}.sqlite`),
   pbkdf2Sha256: jest.fn(async (password, saltHex, iterations, dkLenBytes) => {
     const value = `${password}|${saltHex}|${iterations}|${dkLenBytes}`;
